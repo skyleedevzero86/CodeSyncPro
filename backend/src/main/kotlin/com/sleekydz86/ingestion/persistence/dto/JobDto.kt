@@ -77,6 +77,3 @@ data class CreateJobResponse(
     @JsonProperty("statusUrl")
     val statusUrl: String,
 )
-
-typealias JobStatusResponse = JobStatusResponse
-typealias RetryJobResponse = RetryJobResponse

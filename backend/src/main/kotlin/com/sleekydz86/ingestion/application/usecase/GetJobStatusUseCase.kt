@@ -1,7 +1,9 @@
 package com.sleekydz86.ingestion.application.usecase
 
 import com.sleekydz86.ingestion.domain.model.ItemStatus
+import com.sleekydz86.ingestion.domain.model.Job
 import com.sleekydz86.ingestion.domain.model.JobId
+import com.sleekydz86.ingestion.domain.model.JobItem
 import com.sleekydz86.ingestion.domain.model.JobProgress
 import com.sleekydz86.ingestion.domain.model.JobStatus
 import com.sleekydz86.ingestion.domain.port.JobRepository
@@ -23,7 +25,7 @@ class GetJobStatusUseCase(
             startedAt = job.startedAt,
             completedAt = job.completedAt,
             cancelledAt = job.cancelledAt,
-            items = job.items.map { item ->
+            items = job.items.map { item: JobItem ->
                 JobItemResponse(
                     itemId = item.id.value,
                     projectPath = item.projectPath,

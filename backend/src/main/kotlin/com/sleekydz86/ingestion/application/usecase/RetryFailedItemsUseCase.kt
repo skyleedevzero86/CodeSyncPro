@@ -1,6 +1,7 @@
 package com.sleekydz86.ingestion.application.usecase
 
-
+import com.sleekydz86.ingestion.domain.model.Job
+import com.sleekydz86.ingestion.domain.model.JobItem
 import com.sleekydz86.ingestion.domain.model.JobId
 import com.sleekydz86.ingestion.domain.model.JobStatus
 import com.sleekydz86.ingestion.domain.port.JobQueue
@@ -16,7 +17,7 @@ class RetryFailedItemsUseCase(
     private val retryPolicy: RetryPolicy,
 ) {
     suspend fun execute(jobId: JobId, itemIds: List<String>? = null): RetryJobResponse {
-        val job = jobRepository.findById(jobId)
+        val job: Job = jobRepository.findById(jobId)
             ?: throw JobNotFoundException("Job not found: ${jobId.value}")
 
         if (!job.hasFailedItems()) {
@@ -24,12 +25,12 @@ class RetryFailedItemsUseCase(
         }
 
         val failedItems = if (itemIds != null) {
-            job.getFailedItems().filter { it.id.value in itemIds }
+            job.getFailedItems().filter { item: JobItem -> item.id.value in itemIds }
         } else {
             job.getFailedItems()
         }
 
-        val itemsToRetry = failedItems.filter { item ->
+        val itemsToRetry = failedItems.filter { item: JobItem ->
             item.canRetry() && retryPolicy.shouldRetry(
                 item.error!!,
                 item.retryCount,
@@ -41,15 +42,15 @@ class RetryFailedItemsUseCase(
         }
 
         val now = Instant.now()
-        val updatedItems = itemsToRetry.map { item ->
+        val updatedItems = itemsToRetry.map { item: JobItem ->
             val nextRetryAt = retryPolicy.calculateNextRetryAt(item.retryCount, now)
             item.markAsRetrying(nextRetryAt)
         }
 
         val updatedJob = job.copy(
             status = JobStatus.RETRYING,
-            items = job.items.map { existingItem ->
-                updatedItems.find { it.id == existingItem.id } ?: existingItem
+            items = job.items.map { existingItem: JobItem ->
+                updatedItems.find { updated: JobItem -> updated.id == existingItem.id } ?: existingItem
             },
         )
 

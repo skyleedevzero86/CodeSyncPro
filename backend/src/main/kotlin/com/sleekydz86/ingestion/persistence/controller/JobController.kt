@@ -4,9 +4,12 @@ package com.sleekydz86.ingestion.persistence.controller
 import com.sleekydz86.ingestion.application.usecase.CancelJobUseCase
 import com.sleekydz86.ingestion.application.usecase.CreateJobUseCase
 import com.sleekydz86.ingestion.application.usecase.GetJobStatusUseCase
+import com.sleekydz86.ingestion.application.usecase.JobStatusResponse
 import com.sleekydz86.ingestion.application.usecase.RetryFailedItemsUseCase
 import com.sleekydz86.ingestion.application.usecase.RetryJobResponse
+import com.sleekydz86.ingestion.domain.model.Job
 import com.sleekydz86.ingestion.domain.model.JobId
+import com.sleekydz86.ingestion.domain.model.JobStatus
 import com.sleekydz86.ingestion.persistence.dto.CreateJobRequest
 import com.sleekydz86.ingestion.persistence.dto.CreateJobResponse
 import com.sleekydz86.ingestion.persistence.dto.DtoMapper
@@ -29,7 +32,7 @@ class JobController(
     suspend fun createJob(@Valid @RequestBody request: CreateJobRequest): ResponseEntity<CreateJobResponse> {
         val useCaseRequest = DtoMapper.toUseCaseRequest(request)
 
-        val job = createJobUseCase.execute(useCaseRequest)
+        val job: Job = createJobUseCase.execute(useCaseRequest)
 
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(
             CreateJobResponse(
@@ -42,7 +45,7 @@ class JobController(
     }
 
     @GetMapping("/{jobId}")
-    fun getJobStatus(@PathVariable jobId: String): ResponseEntity<com.sleekydz86.ingestion.persistence.dto.JobStatusResponse> {
+    fun getJobStatus(@PathVariable jobId: String): ResponseEntity<JobStatusResponse> {
         val response = getJobStatusUseCase.execute(JobId(jobId))
         return ResponseEntity.ok(response)
     }

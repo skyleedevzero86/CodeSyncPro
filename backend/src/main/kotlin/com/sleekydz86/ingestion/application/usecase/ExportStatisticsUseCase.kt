@@ -1,6 +1,7 @@
 package com.sleekydz86.ingestion.application.usecase
 
 import com.sleekydz86.ingestion.domain.port.JobRepository
+import com.sleekydz86.ingestion.infrastructure.export.ExcelExportService
 import org.springframework.stereotype.Component
 import java.time.Instant
 

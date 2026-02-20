@@ -165,12 +165,12 @@ class JobMapper {
         )
     }
 
-    private fun parseOptions(options: Map<String, Any>): JobOptions {
+    private fun parseOptions(options: Map<String, Any?>): JobOptions {
         val fileFiltersMap = options["fileFilters"] as? Map<*, *> ?: emptyMap<Any, Any>()
         val concurrencyMap = options["concurrency"] as? Map<*, *> ?: emptyMap<Any, Any>()
 
         return JobOptions(
-            mode = IngestMode.valueOf(options["mode"] as String),
+            mode = IngestMode.valueOf(options["mode"] as? String ?: "FULL"),
             fileFilters = FileFilters(
                 includeGlobs = (fileFiltersMap["includeGlobs"] as? List<*>)?.mapNotNull { it as? String }
                     ?: emptyList(),

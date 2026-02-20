@@ -2,6 +2,7 @@ package com.sleekydz86.ingestion.application.usecase
 
 
 import com.sleekydz86.ingestion.domain.model.IngestMode
+import com.sleekydz86.ingestion.domain.model.ErrorCode
 import com.sleekydz86.ingestion.domain.model.ItemError
 import com.sleekydz86.ingestion.domain.model.ItemId
 import com.sleekydz86.ingestion.domain.model.ItemStatus
@@ -34,38 +35,19 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.logging.Logger
 
 @Component
-class ProcessJobUseCase {
-    private val jobRepository: JobRepository
-    private val projectCatalog: ProjectCatalog
-    private val projectStateStore: ProjectStateStore
-    private val repositorySynchronizer: RepositorySynchronizer
-    private val fileScanner: FileScanner
-    private val embeddingClient: EmbeddingClient
-    private val tempDirectory: Path
-
-    constructor(
-        jobRepository: JobRepository,
-        projectCatalog: ProjectCatalog,
-        projectStateStore: ProjectStateStore,
-        repositorySynchronizer: RepositorySynchronizer,
-        fileScanner: FileScanner,
-        embeddingClient: EmbeddingClient,
-        tempDirectory: Path = Path.of(System.getProperty("java.io.tmpdir"), "ingestion")
-    ) {
-        this.jobRepository = jobRepository
-        this.projectCatalog = projectCatalog
-        this.projectStateStore = projectStateStore
-        this.repositorySynchronizer = repositorySynchronizer
-        this.fileScanner = fileScanner
-        this.embeddingClient = embeddingClient
-        this.tempDirectory = tempDirectory
-        this.logger = Logger.getLogger(ProcessJobUseCase::class.java.name)
-    }
-
-    private val logger: Logger?
+class ProcessJobUseCase(
+    private val jobRepository: JobRepository,
+    private val projectCatalog: ProjectCatalog,
+    private val projectStateStore: ProjectStateStore,
+    private val repositorySynchronizer: RepositorySynchronizer,
+    private val fileScanner: FileScanner,
+    private val embeddingClient: EmbeddingClient,
+    private val tempDirectory: Path = Path.of(System.getProperty("java.io.tmpdir"), "ingestion"),
+) {
+    private val logger: Logger = Logger.getLogger(ProcessJobUseCase::class.java.name)
 
     suspend fun execute(jobId: JobId) {
-        val job = jobRepository.findById(jobId)
+        val job: Job = jobRepository.findById(jobId)
             ?: throw JobNotFoundException("Job not found: ${jobId.value}")
 
         val startedAt = Instant.now()
@@ -302,9 +284,9 @@ class ProcessJobUseCase {
             logger.warning("Failed to process item ${item.filePath}: ${e.message}")
             val error = ItemError(
                 code = when {
-                    e.message?.contains("timeout", ignoreCase = true) == true -> ItemError.ErrorCode.TIMEOUT
-                    e.message?.contains("network", ignoreCase = true) == true -> ItemError.ErrorCode.NETWORK_ERROR
-                    else -> ItemError.ErrorCode.UNKNOWN_ERROR
+                    e.message?.contains("timeout", ignoreCase = true) == true -> ErrorCode.TIMEOUT
+                    e.message?.contains("network", ignoreCase = true) == true -> ErrorCode.NETWORK_ERROR
+                    else -> ErrorCode.UNKNOWN_ERROR
                 },
                 message = e.message ?: "Unknown error",
                 retryable = true,

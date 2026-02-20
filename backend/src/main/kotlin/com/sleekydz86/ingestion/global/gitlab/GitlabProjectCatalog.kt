@@ -1,12 +1,12 @@
 package com.sleekydz86.ingestion.global.gitlab
 
-
+import com.sleekydz86.ingestion.domain.model.Project
 import com.sleekydz86.ingestion.domain.model.SourceConfig
 import com.sleekydz86.ingestion.domain.port.ProjectCatalog
 import org.gitlab4j.api.GitLabApi
 import org.gitlab4j.api.Pager
 import org.gitlab4j.api.models.GroupProjectsFilter
-import org.gitlab4j.api.models.Project
+import org.gitlab4j.api.models.Project as GitLabProject
 import org.gitlab4j.api.models.ProjectFilter
 import org.springframework.stereotype.Component
 import java.util.logging.Logger
@@ -22,7 +22,7 @@ class GitlabProjectCatalog : ProjectCatalog {
         return when {
             sourceConfig.projectIds.isNotEmpty() -> {
                 sourceConfig.projectIds.map { projectId ->
-                    val projectData = gitlabApi.projectApi.getProject(projectId)
+                    val projectData: GitLabProject = gitlabApi.projectApi.getProject(projectId)
                     toProject(projectData, gitlabApi, sourceConfig.targetBranch)
                 }
             }
@@ -33,7 +33,7 @@ class GitlabProjectCatalog : ProjectCatalog {
                         .withIncludeSubGroups(sourceConfig.shouldIncludeSubgroups)
 
                     val pager = gitlabApi.groupApi.getProjects(groupId, filter, sourceConfig.pageSize)
-                    loadAllPages(pager).map { projectData ->
+                    loadAllPages(pager).map { projectData: GitLabProject ->
                         toProject(projectData, gitlabApi, sourceConfig.targetBranch)
                     }
                 }
@@ -44,7 +44,7 @@ class GitlabProjectCatalog : ProjectCatalog {
                     .withMembership(sourceConfig.shouldUseMembershipOnly)
 
                 val pager = gitlabApi.projectApi.getProjects(filter, sourceConfig.pageSize)
-                loadAllPages(pager).map { projectData ->
+                loadAllPages(pager).map { projectData: GitLabProject ->
                     toProject(projectData, gitlabApi, sourceConfig.targetBranch)
                 }
             }
@@ -52,7 +52,7 @@ class GitlabProjectCatalog : ProjectCatalog {
     }
 
     private fun toProject(
-        projectData: Project,
+        projectData: GitLabProject,
         gitlabApi: GitLabApi,
         targetBranch: String,
     ): Project {
@@ -72,7 +72,7 @@ class GitlabProjectCatalog : ProjectCatalog {
     }
 
     private fun resolveHeadCommit(
-        projectData: Project,
+        projectData: GitLabProject,
         gitlabApi: GitLabApi,
         branchName: String,
     ): org.gitlab4j.api.models.Commit? {

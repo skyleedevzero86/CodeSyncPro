@@ -1,13 +1,13 @@
 package com.sleekydz86.ingestion.application.usecase
 
+import com.sleekydz86.ingestion.domain.model.Job
+import com.sleekydz86.ingestion.domain.model.JobItem
 import com.sleekydz86.ingestion.domain.model.JobStatus
 import com.sleekydz86.ingestion.domain.port.JobRepository
 import org.springframework.stereotype.Component
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
-import java.util.LinkedHashMap
-import kotlin.collections.map
 
 @Component
 class GetStatisticsUseCase(
@@ -30,14 +30,14 @@ class GetStatisticsUseCase(
         JobStatus.entries.forEach { statusCounts[it.name] = 0 }
         countByStatus.forEach { (k, v) -> statusCounts[k.name] = v }
 
-        jobs.forEach { job ->
+        jobs.forEach { job: Job ->
             totalProcessedFiles += job.progress.processedFiles
             totalFailedFiles += job.progress.failedFiles
             totalSkippedFiles += job.progress.skippedFiles
             totalProjects += job.progress.totalProjects
         }
 
-        val jobSummaries = jobs.map { job ->
+        val jobSummaries = jobs.map { job: Job ->
             JobSummaryRow(
                 jobId = job.id.value,
                 status = job.status.name,
@@ -57,7 +57,7 @@ class GetStatisticsUseCase(
         }
 
         val errorCodeCounts = mutableMapOf<String, Int>().withDefault { 0 }
-        jobs.flatMap { it.items }.filter { it.error != null }.forEach { item ->
+        jobs.flatMap { it.items }.filter { it.error != null }.forEach { item: JobItem ->
             val code = item.error!!.code.name
             errorCodeCounts[code] = errorCodeCounts.getValue(code) + 1
         }

@@ -3,12 +3,13 @@ package com.sleekydz86.ingestion.persistence.dto
 import com.sleekydz86.ingestion.domain.model.ConcurrencyConfig
 import com.sleekydz86.ingestion.domain.model.FileFilters
 import com.sleekydz86.ingestion.domain.model.JobOptions
+import com.sleekydz86.ingestion.domain.model.SourceConfig
 
 
 object DtoMapper {
 
-    fun toUseCaseRequest(dto: DtoCreateJobRequest): UseCaseCreateJobRequest {
-        return UseCaseCreateJobRequest(
+    fun toUseCaseRequest(dto: CreateJobRequest): com.sleekydz86.ingestion.application.usecase.CreateJobRequest {
+        return com.sleekydz86.ingestion.application.usecase.CreateJobRequest(
             sourceType = dto.sourceType,
             sourceConfig = SourceConfig(
                 baseUrl = dto.sourceConfig.baseUrl,

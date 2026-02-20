@@ -1,6 +1,5 @@
 package com.sleekydz86.ingestion.global.filesystem
 
-import com.sleekydz86.ingestion.domain.model.FileFilters
 import com.sleekydz86.ingestion.domain.port.FileScanner
 import com.sleekydz86.ingestion.domain.port.ScannedFile
 import org.springframework.stereotype.Component
@@ -16,7 +15,7 @@ class DefaultFileScanner : FileScanner {
 
     override fun scanFiles(
         repositoryDirectory: Path,
-        fileFilters: FileFilters,
+        fileFilters: com.sleekydz86.ingestion.domain.model.FileFilters,
         changedFilePaths: Set<String>?,
     ): List<ScannedFile> {
         val candidates = if (changedFilePaths != null) {

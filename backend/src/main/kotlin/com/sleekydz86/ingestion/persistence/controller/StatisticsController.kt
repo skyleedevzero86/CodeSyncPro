@@ -3,6 +3,7 @@ package com.sleekydz86.ingestion.persistence.controller
 
 import com.sleekydz86.ingestion.application.usecase.ExportStatisticsUseCase
 import com.sleekydz86.ingestion.application.usecase.GetStatisticsUseCase
+import com.sleekydz86.ingestion.application.usecase.StatisticsResponse
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -25,7 +26,7 @@ class StatisticsController(
         @RequestParam from: String,
         @RequestParam to: String,
         @RequestParam(required = false, defaultValue = "10000") limit: Int,
-    ): ResponseEntity<GetStatisticsUseCase.StatisticsResponse> {
+    ): ResponseEntity<StatisticsResponse> {
         val fromInstant = Instant.parse(from)
         val toInstant = Instant.parse(to)
         if (fromInstant.isAfter(toInstant)) {

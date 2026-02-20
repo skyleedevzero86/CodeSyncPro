@@ -1,5 +1,6 @@
 package com.sleekydz86.ingestion.domain.service
 
+import com.sleekydz86.ingestion.domain.model.ErrorCode
 import com.sleekydz86.ingestion.domain.model.ItemError
 import java.time.Duration
 import java.time.Instant
@@ -29,11 +30,11 @@ class RetryPolicy(
     }
 
     companion object {
-        private val retryableErrorCodes = setOf(
-            ItemError.ErrorCode.TIMEOUT,
-            ItemError.ErrorCode.NETWORK_ERROR,
-            ItemError.ErrorCode.RATE_LIMIT_EXCEEDED,
-            ItemError.ErrorCode.EMBEDDING_API_ERROR,
+        private val retryableErrorCodes: Set<com.sleekydz86.ingestion.domain.model.ErrorCode> = setOf(
+            com.sleekydz86.ingestion.domain.model.ErrorCode.TIMEOUT,
+            com.sleekydz86.ingestion.domain.model.ErrorCode.NETWORK_ERROR,
+            com.sleekydz86.ingestion.domain.model.ErrorCode.RATE_LIMIT_EXCEEDED,
+            com.sleekydz86.ingestion.domain.model.ErrorCode.EMBEDDING_API_ERROR,
         )
     }
 }

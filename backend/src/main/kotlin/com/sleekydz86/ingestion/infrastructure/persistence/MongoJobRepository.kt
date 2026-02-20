@@ -34,7 +34,7 @@ class MongoJobRepository(
     override fun findByStatus(status: JobStatus, limit: Int, offset: Int): List<Job> {
         val query = Query(Criteria.where("status").`is`(status.name))
             .limit(limit)
-            .skip(offset)
+            .skip(offset.toLong())
         val documents = mongoTemplate.find(query, JobDocument::class.java, "jobs")
         return documents.map { jobMapper.toDomain(it) }
     }
@@ -42,7 +42,7 @@ class MongoJobRepository(
     override fun findAll(limit: Int, offset: Int): List<Job> {
         val query = Query()
             .limit(limit)
-            .skip(offset)
+            .skip(offset.toLong())
         val documents = mongoTemplate.find(query, JobDocument::class.java, "jobs")
         return documents.map { jobMapper.toDomain(it) }
     }
@@ -51,7 +51,7 @@ class MongoJobRepository(
         val criteria = Criteria.where("createdAt").gte(from).lte(to)
         val query = Query(criteria).with(Sort.by(Sort.Direction.DESC, "createdAt"))
             .limit(limit)
-            .skip(offset)
+            .skip(offset.toLong())
         val documents = mongoTemplate.find(query, JobDocument::class.java, "jobs")
         return documents.map { jobMapper.toDomain(it) }
     }

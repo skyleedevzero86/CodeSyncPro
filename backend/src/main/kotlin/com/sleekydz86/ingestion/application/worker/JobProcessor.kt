@@ -5,6 +5,8 @@ import com.sleekydz86.ingestion.application.usecase.ProcessJobUseCase
 import com.sleekydz86.ingestion.domain.model.JobId
 import com.sleekydz86.ingestion.domain.port.JobQueue
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.withPermit
+import org.springframework.boot.ApplicationArguments
 import org.springframework.boot.ApplicationRunner
 import org.springframework.stereotype.Component
 import java.util.logging.Logger
@@ -20,7 +22,7 @@ class JobProcessor(
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private val semaphore = kotlinx.coroutines.sync.Semaphore(maxConcurrency)
 
-    override fun run(args: org.springframework.boot.ApplicationArguments?) {
+        override fun run(args: ApplicationArguments) {
         logger.info("Job processor started")
 
         repeat(maxConcurrency) {
@@ -33,7 +35,7 @@ class JobProcessor(
     private suspend fun processJobs() {
         while (true) {
             try {
-                val jobId = jobQueue.dequeue()
+                val jobId: JobId? = jobQueue.dequeue()
                 if (jobId != null) {
                     semaphore.withPermit {
                         processJob(jobId)

@@ -5,7 +5,7 @@ import java.nio.file.Path
 interface FileScanner {
     fun scanFiles(
         repositoryDirectory: Path,
-        fileFilters: FileFilters,
+        fileFilters: com.sleekydz86.ingestion.domain.model.FileFilters,
         changedFilePaths: Set<String>?,
     ): List<ScannedFile>
 }

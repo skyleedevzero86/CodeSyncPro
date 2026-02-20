@@ -62,7 +62,7 @@ class ExcelExportService {
         jobs.groupingBy { it.status.name }.eachCount().forEach { (status, count) ->
             sheet.createRow(rowNum++).apply {
                 createCell(0).setCellValue(status)
-                createCell(1).setCellValue(count.toLong())
+                createCell(1).setCellValue(count.toDouble())
             }
         }
         sheet.setColumnWidth(0, 6000)
@@ -90,13 +90,13 @@ class ExcelExportService {
             row.createCell(4).setCellValue(job.createdAt.toString())
             row.createCell(5).setCellValue(job.startedAt?.toString() ?: "")
             row.createCell(6).setCellValue(job.completedAt?.toString() ?: "")
-            row.createCell(7).setCellValue(job.progress.totalProjects.toLong())
-            row.createCell(8).setCellValue(job.progress.processedProjects.toLong())
-            row.createCell(9).setCellValue(job.progress.totalFiles.toLong())
-            row.createCell(10).setCellValue(job.progress.processedFiles.toLong())
-            row.createCell(11).setCellValue(job.progress.failedFiles.toLong())
-            row.createCell(12).setCellValue(job.progress.skippedFiles.toLong())
-            row.createCell(13).setCellValue(job.items.size.toLong())
+            row.createCell(7).setCellValue(job.progress.totalProjects.toDouble())
+            row.createCell(8).setCellValue(job.progress.processedProjects.toDouble())
+            row.createCell(9).setCellValue(job.progress.totalFiles.toDouble())
+            row.createCell(10).setCellValue(job.progress.processedFiles.toDouble())
+            row.createCell(11).setCellValue(job.progress.failedFiles.toDouble())
+            row.createCell(12).setCellValue(job.progress.skippedFiles.toDouble())
+            row.createCell(13).setCellValue(job.items.size.toDouble())
         }
         (0..13).forEach { sheet.autoSizeColumn(it) }
     }
@@ -121,7 +121,7 @@ class ExcelExportService {
                 row.createCell(4).setCellValue(item.status.name)
                 row.createCell(5).setCellValue(item.error?.code?.name ?: "")
                 row.createCell(6).setCellValue(item.error?.message ?: "")
-                row.createCell(7).setCellValue(item.retryCount.toLong())
+                row.createCell(7).setCellValue(item.retryCount.toDouble())
             }
         }
         (0..7).forEach { sheet.autoSizeColumn(it) }
