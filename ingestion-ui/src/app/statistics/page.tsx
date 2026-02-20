@@ -1,6 +1,5 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   BarChart,
@@ -14,8 +13,7 @@ import {
   Cell,
   Legend,
 } from "recharts";
-import { fetchStatistics, downloadStatisticsExcel, triggerDownload } from "@/lib/api";
-import type { StatisticsResponse } from "@/types/statistics";
+import { useStatistics } from "@/hooks/useStatistics";
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: "대기",
@@ -37,55 +35,19 @@ const CHART_COLORS = [
   "#ec4899",
 ];
 
-function formatIsoDate(d: Date) {
-  return d.toISOString().slice(0, 19) + "Z";
-}
-
-function lastMonth(): { from: string; to: string } {
-  const to = new Date();
-  const from = new Date(to);
-  from.setDate(from.getDate() - 30);
-  return { from: formatIsoDate(from), to: formatIsoDate(to) };
-}
-
 export default function StatisticsPage() {
-  const [range, setRange] = useState(lastMonth());
-  const [data, setData] = useState<StatisticsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [downloading, setDownloading] = useState(false);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetchStatistics(range.from, range.to);
-      setData(res);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "통계 조회 실패");
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [range.from, range.to]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const handleExport = async () => {
-    setDownloading(true);
-    try {
-      const blob = await downloadStatisticsExcel(range.from, range.to);
-      const fromLabel = range.from.slice(0, 10);
-      const toLabel = range.to.slice(0, 10);
-      triggerDownload(blob, `ingestion-statistics-${fromLabel}-${toLabel}.xlsx`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "엑셀 다운로드 실패");
-    } finally {
-      setDownloading(false);
-    }
-  };
+  const {
+    range,
+    setRangeFrom,
+    setRangeTo,
+    data,
+    loading,
+    error,
+    downloading,
+    load,
+    handleExport,
+    formatIsoDate,
+  } = useStatistics();
 
   const statusChartData = data
     ? Object.entries(data.countByStatus)
@@ -120,7 +82,7 @@ export default function StatisticsPage() {
                   type="datetime-local"
                   value={range.from.slice(0, 16)}
                   onChange={(e) =>
-                    setRange((r) => ({ ...r, from: formatIsoDate(new Date(e.target.value)) }))
+                    setRangeFrom(formatIsoDate(new Date(e.target.value)))
                   }
                   className="rounded border border-neutral-300 bg-white px-2 py-1 dark:border-neutral-600 dark:bg-neutral-800 dark:text-white"
                 />
@@ -131,7 +93,7 @@ export default function StatisticsPage() {
                   type="datetime-local"
                   value={range.to.slice(0, 16)}
                   onChange={(e) =>
-                    setRange((r) => ({ ...r, to: formatIsoDate(new Date(e.target.value)) }))
+                    setRangeTo(formatIsoDate(new Date(e.target.value)))
                   }
                   className="rounded border border-neutral-300 bg-white px-2 py-1 dark:border-neutral-600 dark:bg-neutral-800 dark:text-white"
                 />
@@ -220,7 +182,7 @@ export default function StatisticsPage() {
                         cx="50%"
                         cy="50%"
                         outerRadius={80}
-                        label={({ name, value }) => `${name} ${value}`}
+                        label={({ name, value }: { name: string; value: number }) => `${name} ${value}`}
                       >
                         {statusChartData.map((_, i) => (
                           <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />

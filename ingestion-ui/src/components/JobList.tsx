@@ -1,19 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getJobs } from "@/lib/mock-store";
-import type { JobStatusResponse } from "@/types/job";
+import { useJobs } from "@/hooks/useJobs";
 import { JobCard } from "./JobCard";
 
 export function JobList() {
-  const [jobs, setJobs] = useState<JobStatusResponse[]>([]);
-
-  useEffect(() => {
-    setJobs(getJobs());
-    const t = setInterval(() => setJobs(getJobs()), 2000);
-    return () => clearInterval(t);
-  }, []);
+  const jobs = useJobs();
 
   return (
     <div className="space-y-4">

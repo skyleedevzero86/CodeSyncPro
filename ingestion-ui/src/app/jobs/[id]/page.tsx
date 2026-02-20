@@ -1,11 +1,10 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
-import { getJobById, cancelJob, retryFailedItems } from "@/lib/mock-store";
-import type { JobStatusResponse, JobItemResponse, ItemStatus } from "@/types/job";
+import { useJob } from "@/hooks/useJob";
 import { JobStatusBadge } from "@/components/JobStatusBadge";
+import type { JobItemResponse, ItemStatus } from "@/types/job";
 
 const itemStatusLabel: Record<ItemStatus, string> = {
   PENDING: "대기",
@@ -18,15 +17,8 @@ const itemStatusLabel: Record<ItemStatus, string> = {
 
 export default function JobDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const jobId = params.id as string;
-  const [job, setJob] = useState<JobStatusResponse | null>(null);
-
-  useEffect(() => {
-    setJob(getJobById(jobId) ?? null);
-    const t = setInterval(() => setJob(getJobById(jobId) ?? null), 2000);
-    return () => clearInterval(t);
-  }, [jobId]);
+  const { job, handleCancel, handleRetry } = useJob(jobId);
 
   if (!job) {
     return (
@@ -48,18 +40,6 @@ export default function JobDetailPage() {
   const failedItems = job.items.filter((i) => i.status === "FAILED");
   const canCancel = job.status === "PENDING" || job.status === "PROCESSING";
   const canRetry = failedItems.length > 0;
-
-  const handleCancel = () => {
-    if (!canCancel) return;
-    cancelJob(job.jobId);
-    setJob(getJobById(job.jobId) ?? null);
-  };
-
-  const handleRetry = () => {
-    if (!canRetry) return;
-    retryFailedItems(job.jobId);
-    setJob(getJobById(job.jobId) ?? null);
-  };
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950">
