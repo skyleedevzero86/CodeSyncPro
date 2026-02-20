@@ -25,4 +25,35 @@ replay_pid*
 
 # Kotlin Gradle plugin data, see https://kotlinlang.org/docs/whatsnew20.html#new-directory-for-kotlin-data-in-gradle-projects
 .kotlin/
+
+# Gradle
+.gradle/
+backend/.gradle/
+backend/build/
+backend/out/
+
+# IDE
+.idea/
+backend/.idea/
+*.iml
+*.iws
+*.ipr
+
+# Node.js / Next.js
+node_modules/
+ingestion-ui/node_modules/
+ingestion-ui/.next/
+.next/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables and local config
+*.local
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
 *.yml
