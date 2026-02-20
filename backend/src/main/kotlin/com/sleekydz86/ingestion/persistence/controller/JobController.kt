@@ -1,0 +1,67 @@
+package com.sleekydz86.ingestion.persistence.controller
+
+
+import com.sleekydz86.ingestion.application.usecase.CancelJobUseCase
+import com.sleekydz86.ingestion.application.usecase.CreateJobUseCase
+import com.sleekydz86.ingestion.application.usecase.GetJobStatusUseCase
+import com.sleekydz86.ingestion.application.usecase.RetryFailedItemsUseCase
+import com.sleekydz86.ingestion.application.usecase.RetryJobResponse
+import com.sleekydz86.ingestion.domain.model.JobId
+import com.sleekydz86.ingestion.persistence.dto.CreateJobRequest
+import com.sleekydz86.ingestion.persistence.dto.CreateJobResponse
+import com.sleekydz86.ingestion.persistence.dto.DtoMapper
+import com.sleekydz86.ingestion.persistence.dto.RetryRequest
+import jakarta.validation.Valid
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.*
+
+@RestController
+@RequestMapping("/api/v1/jobs")
+class JobController(
+    private val createJobUseCase: CreateJobUseCase,
+    private val getJobStatusUseCase: GetJobStatusUseCase,
+    private val retryFailedItemsUseCase: RetryFailedItemsUseCase,
+    private val cancelJobUseCase: CancelJobUseCase,
+) {
+
+    @PostMapping
+    suspend fun createJob(@Valid @RequestBody request: CreateJobRequest): ResponseEntity<CreateJobResponse> {
+        val useCaseRequest = DtoMapper.toUseCaseRequest(request)
+
+        val job = createJobUseCase.execute(useCaseRequest)
+
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(
+            CreateJobResponse(
+                jobId = job.id.value,
+                status = job.status,
+                createdAt = job.createdAt,
+                statusUrl = "/api/v1/jobs/${job.id.value}",
+            )
+        )
+    }
+
+    @GetMapping("/{jobId}")
+    fun getJobStatus(@PathVariable jobId: String): ResponseEntity<com.sleekydz86.ingestion.persistence.dto.JobStatusResponse> {
+        val response = getJobStatusUseCase.execute(JobId(jobId))
+        return ResponseEntity.ok(response)
+    }
+
+    @PostMapping("/{jobId}/retry")
+    suspend fun retryFailedItems(
+        @PathVariable jobId: String,
+        @RequestBody request: RetryRequest,
+    ): ResponseEntity<RetryJobResponse> {
+        val response = retryFailedItemsUseCase.execute(
+            JobId(jobId),
+            request.itemIds,
+        )
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(response)
+    }
+
+    @DeleteMapping("/{jobId}")
+    fun cancelJob(@PathVariable jobId: String): ResponseEntity<Map<String, String>> {
+        cancelJobUseCase.execute(JobId(jobId))
+        return ResponseEntity.ok(mapOf("status" to "CANCELLED"))
+    }
+}
