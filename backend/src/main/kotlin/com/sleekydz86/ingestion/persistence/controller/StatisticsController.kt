@@ -29,11 +29,8 @@ class StatisticsController(
     ): ResponseEntity<StatisticsResponse> {
         val fromInstant = Instant.parse(from)
         val toInstant = Instant.parse(to)
-        if (fromInstant.isAfter(toInstant)) {
-            return ResponseEntity.badRequest().build()
-        }
-        val response = getStatisticsUseCase.execute(fromInstant, toInstant, limit.coerceIn(1, 50_000))
-        return ResponseEntity.ok(response)
+        if (fromInstant.isAfter(toInstant)) return ResponseEntity.badRequest().build()
+        return ResponseEntity.ok(getStatisticsUseCase.execute(fromInstant, toInstant, limit.coerceIn(1, 50_000)))
     }
 
     @GetMapping(
@@ -47,9 +44,7 @@ class StatisticsController(
     ): ResponseEntity<ByteArray> {
         val fromInstant = Instant.parse(from)
         val toInstant = Instant.parse(to)
-        if (fromInstant.isAfter(toInstant)) {
-            return ResponseEntity.badRequest().build()
-        }
+        if (fromInstant.isAfter(toInstant)) return ResponseEntity.badRequest().build()
         val bytes = exportStatisticsUseCase.execute(fromInstant, toInstant, limit.coerceIn(1, 50_000))
         val filename = "ingestion-statistics-${DateTimeFormatter.ISO_LOCAL_DATE.format(fromInstant.atZone(java.time.ZoneOffset.UTC))}-${DateTimeFormatter.ISO_LOCAL_DATE.format(toInstant.atZone(java.time.ZoneOffset.UTC))}.xlsx"
         return ResponseEntity.ok()

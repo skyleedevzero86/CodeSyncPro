@@ -6,35 +6,31 @@ import java.time.Duration
 import java.time.Instant
 import kotlin.math.pow
 
-class RetryPolicy(
-    private val maxAttempts: Int = 3,
-    private val initialDelay: Duration = Duration.ofSeconds(1),
-    private val maxDelay: Duration = Duration.ofMinutes(5),
-    private val multiplier: Double = 2.0,
+/** Immutable retry configuration; behavior is implemented as pure functions. */
+data class RetryPolicy(
+    val maxAttempts: Int = 3,
+    val initialDelay: Duration = Duration.ofSeconds(1),
+    val maxDelay: Duration = Duration.ofMinutes(5),
+    val multiplier: Double = 2.0,
 ) {
     fun calculateNextRetryAt(retryCount: Int, baseTime: Instant = Instant.now()): Instant {
-        if (retryCount >= maxAttempts) {
-            throw IllegalArgumentException("Maximum retry attempts exceeded")
-        }
-
+        check(retryCount < maxAttempts) { "Maximum retry attempts exceeded" }
         val delaySeconds = (initialDelay.seconds * multiplier.pow(retryCount)).toLong()
         val delay = Duration.ofSeconds(delaySeconds.coerceAtMost(maxDelay.seconds))
-
         return baseTime.plus(delay)
     }
 
-    fun shouldRetry(error: ItemError, currentRetryCount: Int): Boolean {
-        return error.retryable &&
-                currentRetryCount < maxAttempts &&
-                error.code in retryableErrorCodes
-    }
+    fun shouldRetry(error: ItemError, currentRetryCount: Int): Boolean =
+        error.retryable &&
+            currentRetryCount < maxAttempts &&
+            error.code in RetryPolicyDefaults.retryableErrorCodes
 
-    companion object {
-        private val retryableErrorCodes: Set<com.sleekydz86.ingestion.domain.model.ErrorCode> = setOf(
-            com.sleekydz86.ingestion.domain.model.ErrorCode.TIMEOUT,
-            com.sleekydz86.ingestion.domain.model.ErrorCode.NETWORK_ERROR,
-            com.sleekydz86.ingestion.domain.model.ErrorCode.RATE_LIMIT_EXCEEDED,
-            com.sleekydz86.ingestion.domain.model.ErrorCode.EMBEDDING_API_ERROR,
+    private object RetryPolicyDefaults {
+        val retryableErrorCodes: Set<ErrorCode> = setOf(
+            ErrorCode.TIMEOUT,
+            ErrorCode.NETWORK_ERROR,
+            ErrorCode.RATE_LIMIT_EXCEEDED,
+            ErrorCode.EMBEDDING_API_ERROR,
         )
     }
 }

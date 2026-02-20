@@ -18,11 +18,9 @@ class CreateJobUseCase(
     private val jobQueue: JobQueue,
 ) {
     suspend fun execute(request: CreateJobRequest): Job {
-        val jobId = JobId.generate()
         val now = Instant.now()
-
         val job = Job(
-            id = jobId,
+            id = JobId.generate(),
             sourceType = request.sourceType,
             sourceConfig = request.sourceConfig,
             options = request.options,
@@ -36,11 +34,7 @@ class CreateJobUseCase(
             items = emptyList(),
             metadata = emptyMap(),
         )
-
-        val savedJob = jobRepository.save(job)
-        jobQueue.enqueue(jobId)
-
-        return savedJob
+        return jobRepository.save(job).also { jobQueue.enqueue(job.id) }
     }
 }
 

@@ -16,28 +16,19 @@ class GetStatisticsUseCase(
     fun execute(from: Instant, to: Instant, limit: Int = 10_000): StatisticsResponse {
         val jobs = jobRepository.findByCreatedAtBetween(from, to, limit, 0)
         val countByStatus = jobs.groupingBy { it.status }.eachCount()
-        val byDay = jobs.groupingBy { it.createdAt.atZone(ZoneOffset.UTC).toLocalDate() }
+        val statusCounts = JobStatus.entries.associate { it.name to (countByStatus[it] ?: 0) }
+        val byDay = jobs
+            .groupingBy { it.createdAt.atZone(ZoneOffset.UTC).toLocalDate() }
             .eachCount()
             .toSortedMap()
-            .mapKeys { it.key.format(DateTimeFormatter.ISO_LOCAL_DATE) }
-            .map { (k, v) -> DayCount(k, v) }
+            .map { (k, v) -> DayCount(k.format(DateTimeFormatter.ISO_LOCAL_DATE), v) }
 
-        var totalProcessedFiles = 0
-        var totalFailedFiles = 0
-        var totalSkippedFiles = 0
-        var totalProjects = 0
-        val statusCounts = mutableMapOf<String, Int>().withDefault { 0 }
-        JobStatus.entries.forEach { statusCounts[it.name] = 0 }
-        countByStatus.forEach { (k, v) -> statusCounts[k.name] = v }
+        val totalProcessedFiles = jobs.sumOf { it.progress.processedFiles }
+        val totalFailedFiles = jobs.sumOf { it.progress.failedFiles }
+        val totalSkippedFiles = jobs.sumOf { it.progress.skippedFiles }
+        val totalProjects = jobs.sumOf { it.progress.totalProjects }
 
-        jobs.forEach { job: Job ->
-            totalProcessedFiles += job.progress.processedFiles
-            totalFailedFiles += job.progress.failedFiles
-            totalSkippedFiles += job.progress.skippedFiles
-            totalProjects += job.progress.totalProjects
-        }
-
-        val jobSummaries = jobs.map { job: Job ->
+        val jobSummaries = jobs.map { job ->
             JobSummaryRow(
                 jobId = job.id.value,
                 status = job.status.name,
@@ -56,11 +47,11 @@ class GetStatisticsUseCase(
             )
         }
 
-        val errorCodeCounts = mutableMapOf<String, Int>().withDefault { 0 }
-        jobs.flatMap { it.items }.filter { it.error != null }.forEach { item: JobItem ->
-            val code = item.error!!.code.name
-            errorCodeCounts[code] = errorCodeCounts.getValue(code) + 1
-        }
+        val errorCodeCounts = jobs
+            .flatMap { it.items }
+            .mapNotNull { it.error }
+            .groupingBy { it.code.name }
+            .eachCount()
 
         return StatisticsResponse(
             from = from.toString(),

@@ -14,38 +14,32 @@ import org.springframework.stereotype.Component
 class GetJobStatusUseCase(
     private val jobRepository: JobRepository,
 ) {
-    fun execute(jobId: JobId): JobStatusResponse {
-        val job = jobRepository.findById(jobId)
-            ?: throw JobNotFoundException("Job not found: ${jobId.value}")
-
-        return JobStatusResponse(
-            jobId = job.id.value,
-            status = job.status,
-            progress = job.progress,
-            startedAt = job.startedAt,
-            completedAt = job.completedAt,
-            cancelledAt = job.cancelledAt,
-            items = job.items.map { item: JobItem ->
-                JobItemResponse(
-                    itemId = item.id.value,
-                    projectPath = item.projectPath,
-                    filePath = item.filePath,
-                    status = item.status,
-                    error = item.error?.let { error ->
-                        ErrorResponse(
-                            code = error.code.name,
-                            message = error.message,
-                            retryable = error.retryable,
-                        )
-                    },
-                    retryCount = item.retryCount,
-                    nextRetryAt = item.nextRetryAt,
-                    processedAt = item.processedAt,
+    fun execute(jobId: JobId): JobStatusResponse =
+        jobRepository.findById(jobId)
+            ?.let { job ->
+                JobStatusResponse(
+                    jobId = job.id.value,
+                    status = job.status,
+                    progress = job.progress,
+                    startedAt = job.startedAt,
+                    completedAt = job.completedAt,
+                    cancelledAt = job.cancelledAt,
+                    items = job.items.map { it.toItemResponse() },
                 )
-            },
-        )
-    }
+            }
+            ?: throw JobNotFoundException("Job not found: ${jobId.value}")
 }
+
+private fun JobItem.toItemResponse() = JobItemResponse(
+    itemId = id.value,
+    projectPath = projectPath,
+    filePath = filePath,
+    status = status,
+    error = error?.let { ErrorResponse(it.code.name, it.message, it.retryable) },
+    retryCount = retryCount,
+    nextRetryAt = nextRetryAt,
+    processedAt = processedAt,
+)
 
 data class JobStatusResponse(
     val jobId: String,

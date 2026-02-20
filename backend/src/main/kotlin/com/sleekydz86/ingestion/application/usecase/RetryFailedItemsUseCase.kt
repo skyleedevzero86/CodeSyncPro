@@ -17,50 +17,27 @@ class RetryFailedItemsUseCase(
     private val retryPolicy: RetryPolicy,
 ) {
     suspend fun execute(jobId: JobId, itemIds: List<String>? = null): RetryJobResponse {
-        val job: Job = jobRepository.findById(jobId)
+        val job = jobRepository.findById(jobId)
             ?: throw JobNotFoundException("Job not found: ${jobId.value}")
+        check(job.hasFailedItems()) { throw NoFailedItemsException("Job has no failed items") }
 
-        if (!job.hasFailedItems()) {
-            throw NoFailedItemsException("Job has no failed items")
+        val failedItems = job.getFailedItems()
+            .let { if (itemIds != null) it.filter { item -> item.id.value in itemIds } else it }
+        val itemsToRetry = failedItems.filter { item ->
+            item.canRetry() && item.error != null && retryPolicy.shouldRetry(item.error!!, item.retryCount)
         }
-
-        val failedItems = if (itemIds != null) {
-            job.getFailedItems().filter { item: JobItem -> item.id.value in itemIds }
-        } else {
-            job.getFailedItems()
-        }
-
-        val itemsToRetry = failedItems.filter { item: JobItem ->
-            item.canRetry() && retryPolicy.shouldRetry(
-                item.error!!,
-                item.retryCount,
-            )
-        }
-
-        if (itemsToRetry.isEmpty()) {
-            throw NoRetryableItemsException("No retryable items found")
-        }
+        check(itemsToRetry.isNotEmpty()) { throw NoRetryableItemsException("No retryable items found") }
 
         val now = Instant.now()
-        val updatedItems = itemsToRetry.map { item: JobItem ->
-            val nextRetryAt = retryPolicy.calculateNextRetryAt(item.retryCount, now)
-            item.markAsRetrying(nextRetryAt)
-        }
-
+        val updatedItemsById = itemsToRetry.associate { it.id to it.markAsRetrying(retryPolicy.calculateNextRetryAt(it.retryCount, now)) }
         val updatedJob = job.copy(
             status = JobStatus.RETRYING,
-            items = job.items.map { existingItem: JobItem ->
-                updatedItems.find { updated: JobItem -> updated.id == existingItem.id } ?: existingItem
-            },
+            items = job.items.map { existing -> updatedItemsById[existing.id] ?: existing },
         )
 
         jobRepository.update(updatedJob)
         jobQueue.enqueue(jobId)
-
-        return RetryJobResponse(
-            jobId = jobId.value,
-            itemsToRetry = itemsToRetry.size,
-        )
+        return RetryJobResponse(jobId = jobId.value, itemsToRetry = itemsToRetry.size)
     }
 }
 

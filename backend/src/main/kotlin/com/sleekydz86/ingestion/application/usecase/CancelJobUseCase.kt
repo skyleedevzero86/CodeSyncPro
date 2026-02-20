@@ -12,13 +12,8 @@ class CancelJobUseCase(
     fun execute(jobId: JobId) {
         val job = jobRepository.findById(jobId)
             ?: throw JobNotFoundException("Job not found: ${jobId.value}")
-
-        if (!job.canBeCancelled()) {
-            throw JobCannotBeCancelledException("Job cannot be cancelled in status: ${job.status}")
-        }
-
-        val cancelledJob = job.markAsCancelled(Instant.now())
-        jobRepository.update(cancelledJob)
+        if (!job.canBeCancelled()) throw JobCannotBeCancelledException("Job cannot be cancelled in status: ${job.status}")
+        jobRepository.update(job.markAsCancelled(Instant.now()))
     }
 }
 

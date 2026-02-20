@@ -29,38 +29,30 @@ class JobController(
 ) {
 
     @PostMapping
-    suspend fun createJob(@Valid @RequestBody request: CreateJobRequest): ResponseEntity<CreateJobResponse> {
-        val useCaseRequest = DtoMapper.toUseCaseRequest(request)
-
-        val job: Job = createJobUseCase.execute(useCaseRequest)
-
-        return ResponseEntity.status(HttpStatus.ACCEPTED).body(
-            CreateJobResponse(
-                jobId = job.id.value,
-                status = job.status,
-                createdAt = job.createdAt,
-                statusUrl = "/api/v1/jobs/${job.id.value}",
+    suspend fun createJob(@Valid @RequestBody request: CreateJobRequest): ResponseEntity<CreateJobResponse> =
+        createJobUseCase.execute(DtoMapper.toUseCaseRequest(request)).let { job ->
+            ResponseEntity.status(HttpStatus.ACCEPTED).body(
+                CreateJobResponse(
+                    jobId = job.id.value,
+                    status = job.status,
+                    createdAt = job.createdAt,
+                    statusUrl = "/api/v1/jobs/${job.id.value}",
+                )
             )
-        )
-    }
+        }
 
     @GetMapping("/{jobId}")
-    fun getJobStatus(@PathVariable jobId: String): ResponseEntity<JobStatusResponse> {
-        val response = getJobStatusUseCase.execute(JobId(jobId))
-        return ResponseEntity.ok(response)
-    }
+    fun getJobStatus(@PathVariable jobId: String): ResponseEntity<JobStatusResponse> =
+        ResponseEntity.ok(getJobStatusUseCase.execute(JobId(jobId)))
 
     @PostMapping("/{jobId}/retry")
     suspend fun retryFailedItems(
         @PathVariable jobId: String,
         @RequestBody request: RetryRequest,
-    ): ResponseEntity<RetryJobResponse> {
-        val response = retryFailedItemsUseCase.execute(
-            JobId(jobId),
-            request.itemIds,
+    ): ResponseEntity<RetryJobResponse> =
+        ResponseEntity.status(HttpStatus.ACCEPTED).body(
+            retryFailedItemsUseCase.execute(JobId(jobId), request.itemIds)
         )
-        return ResponseEntity.status(HttpStatus.ACCEPTED).body(response)
-    }
 
     @DeleteMapping("/{jobId}")
     fun cancelJob(@PathVariable jobId: String): ResponseEntity<Map<String, String>> {

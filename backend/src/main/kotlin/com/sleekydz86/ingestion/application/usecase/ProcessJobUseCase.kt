@@ -31,7 +31,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import java.util.logging.Logger
 
 @Component
@@ -47,7 +46,7 @@ class ProcessJobUseCase(
     private val logger: Logger = Logger.getLogger(ProcessJobUseCase::class.java.name)
 
     suspend fun execute(jobId: JobId) {
-        val job: Job = jobRepository.findById(jobId)
+        val job = jobRepository.findById(jobId)
             ?: throw JobNotFoundException("Job not found: ${jobId.value}")
 
         val startedAt = Instant.now()
@@ -58,118 +57,107 @@ class ProcessJobUseCase(
             processJob(updatedJob)
         } catch (e: Exception) {
             logger.severe("Job processing failed: ${e.message}")
-            val failedJob = updatedJob.markAsFailed(Instant.now(), e.message ?: "Unknown error")
-            jobRepository.update(failedJob)
+            jobRepository.update(updatedJob.markAsFailed(Instant.now(), e.message ?: "Unknown error"))
             throw e
         }
     }
 
     private suspend fun processJob(job: Job) = coroutineScope {
-        val allProjects = withContext(Dispatchers.IO) {
-            projectCatalog.listProjects(job.sourceConfig)
-        }
-
+        val allProjects = withContext(Dispatchers.IO) { projectCatalog.listProjects(job.sourceConfig) }
         logger.info("Found ${allProjects.size} projects")
 
-        val projectsToProcess = if (job.options.mode == IngestMode.INCREMENTAL) {
-            val currentStates = withContext(Dispatchers.IO) { projectStateStore.load() }
-            filterChangedProjects(allProjects, currentStates)
-        } else {
-            allProjects
+        val projectsToProcess = when (job.options.mode) {
+            IngestMode.INCREMENTAL -> withContext(Dispatchers.IO) { projectStateStore.load() }
+                .let { currentStates -> filterChangedProjects(allProjects, currentStates) }
+            IngestMode.FULL -> allProjects
         }
-
         logger.info("Processing ${projectsToProcess.size} projects (mode: ${job.options.mode})")
 
         if (projectsToProcess.isEmpty()) {
-            val completedJob = job.copy(
-                status = JobStatus.SUCCESS,
-                completedAt = Instant.now(),
-                progress = job.progress.copy(
-                    totalProjects = allProjects.size,
-                    processedProjects = allProjects.size,
-                ),
+            jobRepository.update(
+                job.copy(
+                    status = JobStatus.SUCCESS,
+                    completedAt = Instant.now(),
+                    progress = job.progress.copy(
+                        totalProjects = allProjects.size,
+                        processedProjects = allProjects.size,
+                    ),
+                )
             )
-            jobRepository.update(completedJob)
             return@coroutineScope
         }
 
-        val concurrencyLimit = job.options.concurrency.projects
-        val semaphore = Semaphore(concurrencyLimit)
-        val updatedStates = ConcurrentHashMap<Long, ProjectState>()
-
+        val semaphore = Semaphore(job.options.concurrency.projects)
         val projectResults = projectsToProcess.map { project ->
-            async {
-                semaphore.withPermit {
-                    processProject(job, project)
-                }
-            }
+            async { semaphore.withPermit { processProject(job, project) } }
         }.awaitAll()
 
-        projectResults.forEach { (project, items) ->
-            val hasSuccess = items.any { it.status == ItemStatus.SUCCESS }
-            if (hasSuccess && project.versionInstant() != null) {
-                updatedStates[project.id] = ProjectState(
-                    projectId = project.id,
-                    projectPath = project.pathWithNamespace,
-                    repositoryUrl = project.httpUrlToRepo,
-                    versionInstant = project.versionInstant()!!,
-                )
+        val updatedStates = projectResults
+            .filter { (project, items) -> items.any { it.status == ItemStatus.SUCCESS } && project.versionInstant() != null }
+            .mapNotNull { (project, _) ->
+                project.versionInstant()?.let { version ->
+                    project.id to ProjectState(
+                        projectId = project.id,
+                        projectPath = project.pathWithNamespace,
+                        repositoryUrl = project.httpUrlToRepo,
+                        versionInstant = version,
+                    )
+                }
             }
-        }
+            .toMap()
 
         if (updatedStates.isNotEmpty()) {
-            withContext(Dispatchers.IO) {
-                projectStateStore.save(updatedStates)
-            }
+            withContext(Dispatchers.IO) { projectStateStore.save(updatedStates) }
         }
 
         val totalFiles = projectResults.sumOf { (_, items) -> items.count { it.status == ItemStatus.SUCCESS } }
         val failedFiles = projectResults.sumOf { (_, items) -> items.count { it.status == ItemStatus.FAILED } }
+        val totalItemCount = projectResults.sumOf { (_, items) -> items.size }
 
         val finalJob = job.copy(
             progress = job.progress.copy(
                 totalProjects = allProjects.size,
                 processedProjects = projectsToProcess.size,
-                totalFiles = projectResults.sumOf { (_, items) -> items.size },
+                totalFiles = totalItemCount,
                 processedFiles = totalFiles,
                 failedFiles = failedFiles,
             ),
         )
-
-        val completedAt = Instant.now()
-        val finalStatus = when {
-            failedFiles == 0 -> finalJob.markAsSuccess(completedAt)
-            totalFiles > 0 -> finalJob.markAsPartialSuccess(completedAt)
-            else -> finalJob.markAsFailed(completedAt, "All files failed")
-        }
-
+        val finalStatus = computeFinalStatus(finalJob, totalFiles, failedFiles, Instant.now())
         jobRepository.update(finalStatus)
     }
+
+    private fun computeFinalStatus(job: Job, totalFiles: Int, failedFiles: Int, completedAt: Instant): Job =
+        when {
+            failedFiles == 0 -> job.markAsSuccess(completedAt)
+            totalFiles > 0 -> job.markAsPartialSuccess(completedAt)
+            else -> job.markAsFailed(completedAt, "All files failed")
+        }
 
     private fun filterChangedProjects(
         projects: List<Project>,
         currentStates: Map<Long, ProjectState>,
-    ): List<Project> {
-        return projects.filter { project ->
-            val currentVersion = project.versionInstant()
-            if (currentVersion == null) {
+    ): List<Project> = projects.filter { project ->
+        val currentVersion = project.versionInstant()
+        when {
+            currentVersion == null -> {
                 logger.info("Project ${project.pathWithNamespace} has no version, will process")
                 true
-            } else {
-                val lastState = currentStates[project.id]
-                if (lastState == null) {
-                    logger.info("Project ${project.pathWithNamespace} not in state, will process")
-                    true
-                } else {
-                    val shouldProcess = currentVersion.isAfter(lastState.versionInstant)
-                    if (shouldProcess) {
-                        logger.info(
-                            "Project ${project.pathWithNamespace} changed: " +
-                                    "current=$currentVersion last=${lastState.versionInstant}"
-                        )
-                    }
-                    shouldProcess
+            }
+            currentStates[project.id] == null -> {
+                logger.info("Project ${project.pathWithNamespace} not in state, will process")
+                true
+            }
+            else -> {
+                val lastState = currentStates[project.id]!!
+                val shouldProcess = currentVersion.isAfter(lastState.versionInstant)
+                if (shouldProcess) {
+                    logger.info(
+                        "Project ${project.pathWithNamespace} changed: " +
+                            "current=$currentVersion last=${lastState.versionInstant}"
+                    )
                 }
+                shouldProcess
             }
         }
     }
@@ -192,18 +180,15 @@ class ProcessJobUseCase(
             )
         }
 
-        val changedFilePaths = if (job.options.mode == IngestMode.INCREMENTAL &&
-            syncResult.changedFilePaths != null &&
-            syncResult.changedFilePaths!!.isEmpty()
-        ) {
-            logger.info("No changed files in ${project.pathWithNamespace}")
-            return@coroutineScope project to emptyList<JobItem>()
-        } else {
-            if (job.options.mode == IngestMode.INCREMENTAL) {
-                syncResult.changedFilePaths
-            } else {
-                null
+        val changedFilePaths = when {
+            job.options.mode == IngestMode.INCREMENTAL &&
+                syncResult.changedFilePaths != null &&
+                syncResult.changedFilePaths!!.isEmpty() -> {
+                logger.info("No changed files in ${project.pathWithNamespace}")
+                return@coroutineScope project to emptyList<JobItem>()
             }
+            job.options.mode == IngestMode.INCREMENTAL -> syncResult.changedFilePaths
+            else -> null
         }
 
         val scannedFiles = withContext(Dispatchers.IO) {
@@ -261,49 +246,43 @@ class ProcessJobUseCase(
         val updatedItem = item.copy(status = ItemStatus.PROCESSING)
 
         return try {
-            val file = fileScanner.scanFiles(
+            fileScanner.scanFiles(
                 repositoryDirectory = syncResult.repositoryDirectory,
                 fileFilters = job.options.fileFilters,
                 changedFilePaths = setOf(item.filePath),
             ).firstOrNull()
-
-            if (file == null) {
-                updatedItem.markAsSkipped("File not found")
-            } else {
-                embeddingClient.upsertDocument(
-                    sourceConfig = job.sourceConfig,
-                    projectPath = project.pathWithNamespace,
-                    filePath = item.filePath,
-                    content = file.content,
-                    commitSha = syncResult.currentCommitSha,
-                    branchName = syncResult.branchName,
-                )
-                updatedItem.markAsSuccess(Instant.now())
-            }
+                ?.let { file ->
+                    embeddingClient.upsertDocument(
+                        sourceConfig = job.sourceConfig,
+                        projectPath = project.pathWithNamespace,
+                        filePath = item.filePath,
+                        content = file.content,
+                        commitSha = syncResult.currentCommitSha,
+                        branchName = syncResult.branchName,
+                    )
+                    updatedItem.markAsSuccess(Instant.now())
+                }
+                ?: updatedItem.markAsSkipped("File not found")
         } catch (e: Exception) {
             logger.warning("Failed to process item ${item.filePath}: ${e.message}")
-            val error = ItemError(
-                code = when {
-                    e.message?.contains("timeout", ignoreCase = true) == true -> ErrorCode.TIMEOUT
-                    e.message?.contains("network", ignoreCase = true) == true -> ErrorCode.NETWORK_ERROR
-                    else -> ErrorCode.UNKNOWN_ERROR
-                },
-                message = e.message ?: "Unknown error",
-                retryable = true,
+            updatedItem.markAsFailed(
+                ItemError(
+                    code = when {
+                        e.message?.contains("timeout", ignoreCase = true) == true -> ErrorCode.TIMEOUT
+                        e.message?.contains("network", ignoreCase = true) == true -> ErrorCode.NETWORK_ERROR
+                        else -> ErrorCode.UNKNOWN_ERROR
+                    },
+                    message = e.message ?: "Unknown error",
+                    retryable = true,
+                )
             )
-            updatedItem.markAsFailed(error)
         }
     }
 
-    private suspend fun cleanupDirectory(directory: Path) {
+    private suspend fun cleanupDirectory(directory: Path) =
         withContext(Dispatchers.IO) {
-            try {
-                Files.walk(directory)
-                    .sorted(Comparator.reverseOrder())
-                    .forEach { Files.deleteIfExists(it) }
-            } catch (e: Exception) {
-                logger.warning("Failed to cleanup directory ${directory}: ${e.message}")
-            }
+            runCatching {
+                Files.walk(directory).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+            }.onFailure { e -> logger.warning("Failed to cleanup directory $directory: ${e.message}") }
         }
-    }
 }
