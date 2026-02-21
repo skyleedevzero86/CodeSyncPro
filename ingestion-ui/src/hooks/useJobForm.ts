@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { createJob } from "@/lib/mock-store";
+import { createJob } from "@/lib/api";
 import type { CreateJobRequest, SourceType, IngestMode } from "@/types/job";
 
 const defaultRequest: CreateJobRequest = {
@@ -34,6 +34,7 @@ export function useJobForm() {
   const router = useRouter();
   const [req, setReq] = useState<CreateJobRequest>(defaultRequest);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const setSourceType = useCallback((sourceType: SourceType) => {
     setReq((r) => ({ ...r, sourceType }));
@@ -49,12 +50,18 @@ export function useJobForm() {
   }, []);
 
   const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
+    async (e: React.FormEvent) => {
       e.preventDefault();
       setSubmitting(true);
-      const res = createJob(req);
-      setSubmitting(false);
-      router.push(`/jobs/${res.jobId}`);
+      setError(null);
+      try {
+        const res = await createJob(req);
+        router.push(`/jobs/${res.jobId}`);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "작업 생성에 실패했습니다.");
+      } finally {
+        setSubmitting(false);
+      }
     },
     [req, router]
   );
@@ -62,6 +69,7 @@ export function useJobForm() {
   return {
     req,
     submitting,
+    error,
     setSourceType,
     setBaseUrl,
     setAccessToken,

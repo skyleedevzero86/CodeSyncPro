@@ -5,6 +5,7 @@ import com.sleekydz86.ingestion.application.usecase.CancelJobUseCase
 import com.sleekydz86.ingestion.application.usecase.CreateJobUseCase
 import com.sleekydz86.ingestion.application.usecase.GetJobStatusUseCase
 import com.sleekydz86.ingestion.application.usecase.JobStatusResponse
+import com.sleekydz86.ingestion.application.usecase.ListJobsUseCase
 import com.sleekydz86.ingestion.application.usecase.RetryFailedItemsUseCase
 import com.sleekydz86.ingestion.application.usecase.RetryJobResponse
 import com.sleekydz86.ingestion.domain.model.Job
@@ -24,9 +25,17 @@ import org.springframework.web.bind.annotation.*
 class JobController(
     private val createJobUseCase: CreateJobUseCase,
     private val getJobStatusUseCase: GetJobStatusUseCase,
+    private val listJobsUseCase: ListJobsUseCase,
     private val retryFailedItemsUseCase: RetryFailedItemsUseCase,
     private val cancelJobUseCase: CancelJobUseCase,
 ) {
+
+    @GetMapping
+    fun listJobs(
+        @RequestParam(required = false, defaultValue = "100") limit: Int,
+        @RequestParam(required = false, defaultValue = "0") offset: Int,
+    ): ResponseEntity<List<JobStatusResponse>> =
+        ResponseEntity.ok(listJobsUseCase.execute(limit, offset))
 
     @PostMapping
     suspend fun createJob(@Valid @RequestBody request: CreateJobRequest): ResponseEntity<CreateJobResponse> =
