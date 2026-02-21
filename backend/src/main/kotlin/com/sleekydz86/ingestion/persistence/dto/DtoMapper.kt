@@ -14,8 +14,8 @@ object DtoMapper {
             sourceConfig = SourceConfig(
                 baseUrl = dto.sourceConfig.baseUrl,
                 accessToken = dto.sourceConfig.accessToken,
-                projectIds = dto.sourceConfig.projectIds,
-                groupIds = dto.sourceConfig.groupIds,
+                projectIds = dto.sourceConfig.projectIds ?: emptyList(),
+                groupIds = dto.sourceConfig.groupIds ?: emptyList(),
                 targetBranch = dto.sourceConfig.targetBranch,
                 shouldIncludeSubgroups = dto.sourceConfig.shouldIncludeSubgroups,
                 shouldIncludeArchived = dto.sourceConfig.shouldIncludeArchived,

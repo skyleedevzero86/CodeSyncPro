@@ -10,6 +10,8 @@ const defaultRequest: CreateJobRequest = {
   sourceConfig: {
     baseUrl: "https://gitlab.com",
     accessToken: "",
+    projectIds: [],
+    groupIds: [],
     targetBranch: "main",
     shouldIncludeSubgroups: true,
     shouldIncludeArchived: false,

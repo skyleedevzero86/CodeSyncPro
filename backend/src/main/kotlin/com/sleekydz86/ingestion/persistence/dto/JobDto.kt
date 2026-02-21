@@ -31,8 +31,8 @@ data class SourceConfigDto(
     @field:NotBlank
     val accessToken: String,
 
-    val projectIds: List<Long> = emptyList(),
-    val groupIds: List<Long> = emptyList(),
+    val projectIds: List<Long>? = null,
+    val groupIds: List<Long>? = null,
     val targetBranch: String = "main",
     val shouldIncludeSubgroups: Boolean = true,
     val shouldIncludeArchived: Boolean = false,
