@@ -3,7 +3,9 @@ package com.sleekydz86.ingestion.application.worker
 
 import com.sleekydz86.ingestion.application.usecase.ProcessJobUseCase
 import com.sleekydz86.ingestion.domain.model.JobId
+import com.sleekydz86.ingestion.domain.model.JobStatus
 import com.sleekydz86.ingestion.domain.port.JobQueue
+import com.sleekydz86.ingestion.domain.port.JobRepository
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.withPermit
 import org.springframework.boot.ApplicationArguments
@@ -14,6 +16,7 @@ import java.util.logging.Logger
 @Component
 class JobProcessor(
     private val jobQueue: JobQueue,
+    private val jobRepository: JobRepository,
     private val processJobUseCase: ProcessJobUseCase,
     private val maxConcurrency: Int = 5,
 ) : ApplicationRunner {
@@ -22,7 +25,8 @@ class JobProcessor(
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private val semaphore = kotlinx.coroutines.sync.Semaphore(maxConcurrency)
 
-        override fun run(args: ApplicationArguments) {
+    override fun run(args: ApplicationArguments) {
+        runBlocking { reEnqueuePendingJobs() }
         logger.info("Job processor started")
 
         repeat(maxConcurrency) {
@@ -47,6 +51,17 @@ class JobProcessor(
                 logger.severe("Error processing job: ${e.message}")
                 delay(5000)
             }
+        }
+    }
+
+    private suspend fun reEnqueuePendingJobs() {
+        val pending = jobRepository.findByStatus(JobStatus.PENDING, limit = 500, offset = 0)
+        pending.forEach { job ->
+            jobQueue.enqueue(job.id)
+            logger.info("Re-enqueued PENDING job: ${job.id.value}")
+        }
+        if (pending.isNotEmpty()) {
+            logger.info("Re-enqueued ${pending.size} PENDING job(s) on startup")
         }
     }
 

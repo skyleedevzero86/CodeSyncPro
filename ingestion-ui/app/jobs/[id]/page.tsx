@@ -123,9 +123,18 @@ export default function JobDetailPage() {
             </div>
           </div>
           {job.items.length === 0 ? (
-            <p className="mt-4 text-sm text-neutral-500 dark:text-neutral-400">
-              항목이 없거나 아직 스캔되지 않았습니다.
-            </p>
+            <div className="mt-4 space-y-1">
+              <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                {job.status === "PENDING" || job.status === "PROCESSING" || job.status === "RETRYING"
+                  ? "작업이 대기 중이거나 처리 중입니다. 잠시 후 새로고침하세요."
+                  : "항목이 없거나 아직 스캔되지 않았습니다."}
+              </p>
+              {(job.status === "SUCCESS" || job.status === "FAILED") && (
+                <p className="text-xs text-neutral-400 dark:text-neutral-500">
+                  GitLab Base URL과 Access Token이 올바른지 확인해 보세요.
+                </p>
+              )}
+            </div>
           ) : (
             <div className="mt-4 overflow-x-auto">
               <table className="w-full text-sm">
