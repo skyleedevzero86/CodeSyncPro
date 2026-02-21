@@ -1,4 +1,5 @@
 # Code Repository Ingestion Service
+
 <br/>
 <img width="701" height="313" alt="image" src="https://github.com/user-attachments/assets/19fdc693-5d5b-4105-b67d-53f7a79a69b1" />
 <br/>
@@ -45,13 +46,42 @@ GitLab, GitHub 등 다양한 소스 저장소에서 코드를 자동으로 수�
 
 ### 기술 스택
 
-- **언어**: Kotlin 1.9+
-- **프레임워크**: Spring Boot 3.3+
-- **비동기**: Kotlin Coroutines
+- **Backend**: Kotlin 2.2+, Spring Boot 4.x, Java 21, Kotlin Coroutines
 - **데이터베이스**: MongoDB (Spring Data MongoDB)
-- **Git 라이브러리**: JGit 6.9+
-- **GitLab API**: GitLab4J 6.2+
-- **HTTP 클라이언트**: OkHttp 4.12+
+- **Git**: JGit 6.9+, GitLab API (GitLab4J 6.2+), HTTP 클라이언트 OkHttp 4.12+
+- **ingestion-ui**: Next.js 16, React 19, TypeScript
+- **embedding-server**: Python 3.12+, FastAPI, Chroma, sentence-transformers
+
+---
+
+## 📁 프로젝트 구조
+
+```
+CodeSyncPro/
+├── backend/           # 수집 API 서버 (Kotlin, Spring Boot 4)
+├── ingestion-ui/       # 작업 목록·상세·생성 UI (Next.js 16)
+├── embedding-server/   # 임베딩·벡터 저장·RAG 검색 (FastAPI)
+└── README.md
+```
+
+- **backend**: 작업 CRUD, 큐 처리, GitLab 연동, 임베딩 서버로 전송
+- **ingestion-ui**: 백엔드 API 호출, 작업 목록/상세/생성 화면
+- **embedding-server**: 백엔드가 보낸 문서 임베딩 저장 및 검색 API
+
+---
+
+## 🚀 시작하기 (실행 방법)
+
+### 사전 요구 사항
+
+- **Java 21**, **Node.js 18+** (pnpm 권장), **Python 3.12+**
+- **MongoDB** 실행 중 (로컬 기본: `localhost:27017`)
+
+### MongoDB
+
+- 로컬에서 인증 없이 사용: `MONGODB_URI=mongodb://localhost:27017/ingestion_service` 로 실행
+- 인증 사용 시: `application.yml`의 `spring.data.mongodb.uri` 또는 환경 변수 `MONGODB_URI`에 `mongodb://사용자:비밀번호@localhost:27017/ingestion_service?authSource=admin` 형식으로 설정
+- URI가 비어 있거나 인증 정보가 없으면 백엔드 `MongoConfig`가 기본 인증 URI를 사용합니다.
 
 ---
 
@@ -116,6 +146,7 @@ GitLab, GitHub 등 다양한 소스 저장소에서 코드를 자동으로 수�
 **책임**: 외부 인터페이스 제공 및 요청/응답 변환
 
 - **JobController**: REST API 엔드포인트 제공
+  - `GET /api/v1/jobs`: 작업 목록 조회 (쿼리: `limit`, `offset`)
   - `POST /api/v1/jobs`: 작업 생성
   - `GET /api/v1/jobs/{jobId}`: 작업 상태 조회
   - `POST /api/v1/jobs/{jobId}/retry`: 실패 항목 재시도
@@ -138,7 +169,7 @@ GitLab, GitHub 등 다양한 소스 저장소에서 코드를 자동으로 수�
   - `CancelJobUseCase`: 작업 취소
 
 - **Workers**:
-  - `JobProcessor`: 백그라운드 작업 처리 워커
+  - `JobProcessor`: 백그라운드 작업 처리 워커. 기동 시 DB의 PENDING 작업을 큐에 재등록하여 재시작 후에도 미처리 작업이 처리되도록 함.
 
 #### 3. Domain Layer (도메인 계층)
 
@@ -414,12 +445,12 @@ GitLab, GitHub 등 다양한 소스 저장소에서 코드를 자동으로 수�
 
 ```javascript
 // jobs 컬렉션 인덱스
-db.jobs.createIndex({ "status": 1, "createdAt": -1 })
-db.jobs.createIndex({ "createdAt": -1 })
+db.jobs.createIndex({ status: 1, createdAt: -1 });
+db.jobs.createIndex({ createdAt: -1 });
 
 // project_states 컬렉션 인덱스
-db.project_states.createIndex({ "projectId": 1 }, { unique: true })
-db.project_states.createIndex({ "projectPath": 1 })
+db.project_states.createIndex({ projectId: 1 }, { unique: true });
+db.project_states.createIndex({ projectPath: 1 });
 ```
 
 ### 데이터 모델 특징
@@ -463,9 +494,6 @@ db.project_states.createIndex({ "projectPath": 1 })
 1. **인증/인가**: API Key 기반 인증 (향후 구현)
 2. **자격 증명**: Access Token은 환경 변수로 관리
 3. **네트워크**: HTTPS 통신 필수
-4. **데이터 보안**: 민감 정보 필터링 (`.env` 파일 등)
+4. **데이터 보안**: 민감 정보 필터링 (`.env` 파일 등). MongoDB URI는 로그에 비밀번호가 마스킹되어 출력됨 (`MongoConfig`).
 
 ---
-
-## 📝 참고 자료
-
