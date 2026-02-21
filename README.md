@@ -5,6 +5,10 @@
 <br/>
 ## 📋 프로젝트 소개
 
+<img width="728" height="210" alt="image" src="https://github.com/user-attachments/assets/f4b80ac7-8075-4d02-b2d1-3966b02cdce2" />
+<img width="828" height="896" alt="image" src="https://github.com/user-attachments/assets/51ff0771-3bb3-447f-9f2f-0aed60a655dc" />
+<br/>
+
 ### 개요
 
 **Code Repository Ingestion Service**는 AI 에이전트가 직접 사용할 수 있는 엔터프라이즈급 코드 저장소 수집 서비스입니다. <br/>
