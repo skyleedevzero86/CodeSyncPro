@@ -57,3 +57,7 @@ yarn-error.log*
 .env.production.local
 
 *.yml
+
+embedding-server/app/__pycache__/
+ingestion-ui/next-env.d.ts
+ingestion-ui/next.config.ts
