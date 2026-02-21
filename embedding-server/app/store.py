@@ -2,15 +2,37 @@ import hashlib
 import logging
 import os
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import chromadb
+from chromadb.api.types import Documents, Embeddings
 from chromadb.config import Settings as ChromaSettings
 
 logger = logging.getLogger(__name__)
 
 COLLECTION_NAME = "gitlab_documents"
 MAX_CONTENT_LENGTH = 8000
+
+
+class _SentenceTransformerEmbeddingFunction:
+    """ChromaDB 0.5 compatible embedding function: __call__(self, input) -> Embeddings."""
+
+    def __init__(self, model_name: str):
+        self._model_name = model_name
+        self._model = None
+
+    def _get_model(self):
+        if self._model is None:
+            from sentence_transformers import SentenceTransformer
+            self._model = SentenceTransformer(self._model_name)
+        return self._model
+
+    def __call__(self, input: Documents) -> Embeddings:
+        if not input:
+            return []
+        model = self._get_model()
+        embeddings = model.encode(input, show_progress_bar=False)
+        return embeddings.tolist()
 
 
 def _doc_id(repository_url: str, branch_name: str, file_path: str, commit_sha: Optional[str]) -> str:
@@ -38,13 +60,6 @@ class EmbeddingStore:
         self._embedding_model_name = embedding_model
         self._client: Optional[chromadb.PersistentClient] = None
         self._collection = None
-        self._embedding_fn = None
-
-    def _get_embedding_fn(self):
-        if self._embedding_fn is None:
-            from sentence_transformers import SentenceTransformer
-            self._embedding_fn = SentenceTransformer(self._embedding_model_name)
-        return self._embedding_fn
 
     def _get_client(self) -> chromadb.PersistentClient:
         if self._client is None:
@@ -58,11 +73,11 @@ class EmbeddingStore:
         if self._collection is not None:
             return self._collection
         client = self._get_client()
-        model = self._get_embedding_fn()
+        embedding_function = _SentenceTransformerEmbeddingFunction(self._embedding_model_name)
         self._collection = client.get_or_create_collection(
             name=self._collection_name,
             metadata={"description": "GitLab ingested files for RAG"},
-            embedding_function=lambda texts: model.encode(texts, show_progress_bar=False).tolist(),
+            embedding_function=embedding_function,
         )
         return self._collection
 
